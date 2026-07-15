@@ -17,7 +17,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from services import copernicus, inpe_bdc, terrabrasilis, pdf_report, context_layers
+from services import copernicus, inpe_bdc, terrabrasilis, pdf_report, context_layers, sema_mt
 
 app = FastAPI(title="MT GeoApp", version="1.0.0")
 
@@ -67,6 +67,7 @@ class ReportRequest(BaseModel):
     deter_summary: Optional[dict] = None
     prodes_summary: Optional[dict] = None
     context_summary: Optional[dict] = None  # TI / UC / focos de calor
+    car_sema_summary: Optional[dict] = None  # CAR/UC/fiscalizacao via SEMA-MT (fonte nao oficial)
     generated_at: Optional[str] = None
 
 
@@ -235,6 +236,28 @@ async def get_context_summary(req: ContextRequest):
         return data
     except Exception as e:
         raise HTTPException(502, f"Erro ao consultar contexto socioambiental: {e}")
+
+
+# ---------- CAMADAS ADICIONAIS: CAR / SEMA-MT ----------
+
+@app.post("/api/context/car")
+async def get_car_sema_context(req: ContextRequest):
+    """Agrega, para o poligono desenhado: Unidades de Conservacao (via
+    Geoportal SEMA-MT), Area de Preservacao Permanente (CAR_APP), Reserva
+    Legal (CAR_ARL), Area Consolidada/uso antropico e Autuacoes/Embargos
+    ambientais da SEMA-MT que intersectam a area.
+
+    ATENCAO: estas camadas sao obtidas via um GeoServer da SEMA-MT cujo
+    acesso depende de uma chave (authkey) localizada em documentacao
+    tecnica de terceiros, SEM confirmacao oficial da SEMA-MT sobre
+    estabilidade ou termos de uso. Use como informacao complementar as
+    fontes oficiais (TerraBrasilis/INPE) exibidas em /api/context/summary.
+    """
+    try:
+        data = await sema_mt.get_car_sema_summary(geometry=req.geometry.dict())
+        return data
+    except Exception as e:
+        raise HTTPException(502, f"Erro ao consultar camadas SEMA-MT/CAR: {e}")
 
 
 # ---------- CREDENTIAL VALIDATION ----------

@@ -197,7 +197,7 @@ def build_pdf(payload: dict) -> bytes:
 
         if alerts:
             for a in alerts:
-                a_clean = a.replace("\u26a0\ufe0f", "[ALERTA]").replace("\U0001f525", "[FOGO]").strip()
+                a_clean = a.replace("\u26a0\ufe0f", "[ALERTA]").replace("\U0001f525", "[FOGO]").replace("\u2139\ufe0f", "[INFO]").strip()
                 elements.append(Paragraph(a_clean, ParagraphStyle(
                     "alert", parent=normal, textColor=colors.HexColor("#a83232"), fontSize=9,
                 )))
@@ -249,11 +249,72 @@ def build_pdf(payload: dict) -> bytes:
             )
             elements.append(Paragraph(f"<b>Focos de calor mais recentes:</b> {focos_txt}", small))
 
+    # ---- Camadas complementares CAR / SEMA-MT (fonte nao oficial) ----
+    car_sema = payload.get("car_sema_summary")
+    if car_sema:
+        elements.append(PageBreak())
+        elements.append(Paragraph("6. Camadas Complementares — CAR / SEMA-MT", h2))
+        elements.append(Paragraph(
+            "<b>[FONTE NÃO OFICIALMENTE CONFIRMADA]</b> As informações desta seção foram "
+            "obtidas de um GeoServer da SEMA-MT (Secretaria de Estado de Meio Ambiente de "
+            "Mato Grosso) acessado por meio de uma chave (authkey) localizada em documentação "
+            "técnica de terceiros publicamente disponível, SEM confirmação oficial da SEMA-MT "
+            "sobre estabilidade do serviço ou termos de uso. Utilize como informação "
+            "complementar às fontes oficiais (Copernicus/INPE/TerraBrasilis) apresentadas nas "
+            "seções anteriores, e não como base isolada para decisões de compliance.",
+            ParagraphStyle("car_warn", parent=small, textColor=colors.HexColor("#a86b00"), fontSize=8),
+        ))
+        elements.append(Spacer(1, 0.25 * cm))
+
+        uc_sema = car_sema.get("unidades_conservacao_sema", {})
+        car_app = car_sema.get("car_app", {})
+        car_arl = car_sema.get("car_arl", {})
+        area_consolidada = car_sema.get("area_consolidada", {})
+        autuacoes = car_sema.get("autuacoes_fiscalizacao", {})
+        car_alerts = car_sema.get("alerts", [])
+
+        if car_alerts:
+            for a in car_alerts:
+                a_clean = a.replace("\u26a0\ufe0f", "[ALERTA]").replace("\u2139\ufe0f", "[INFO]").strip()
+                elements.append(Paragraph(a_clean, ParagraphStyle(
+                    "car_alert", parent=normal, textColor=colors.HexColor("#a83232"), fontSize=9,
+                )))
+            elements.append(Spacer(1, 0.25 * cm))
+
+        rows4 = [["Camada (SEMA-MT / SIMCAR)", "Ocorrências", "Área total (ha)"]]
+        rows4.append(["Unidades de Conservação (Fed+Est+Mun)", str(uc_sema.get("count", 0)), "—"])
+        rows4.append(["CAR - Área de Preservação Permanente", str(car_app.get("count", 0)), str(car_app.get("area_total_ha", 0))])
+        rows4.append(["CAR - Reserva Legal", str(car_arl.get("count", 0)), str(car_arl.get("area_total_ha", 0))])
+        rows4.append(["Área Consolidada / uso antrópico", str(area_consolidada.get("count", 0)), str(area_consolidada.get("area_total_ha", 0))])
+        rows4.append(["Autuações / Embargos ambientais", str(autuacoes.get("count", 0)), "—"])
+        ct2 = Table(rows4, colWidths=[9 * cm, 3.5 * cm, 3.5 * cm])
+        ct2.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#8a6d1f")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("PADDING", (0, 0), (-1, -1), 5),
+        ]))
+        elements.append(ct2)
+        elements.append(Spacer(1, 0.25 * cm))
+
+        if uc_sema.get("items"):
+            nomes = ", ".join(f"{i.get('nome','')} ({i.get('esfera','')})" for i in uc_sema["items"] if i.get("nome"))
+            elements.append(Paragraph(f"<b>Unidades de Conservação (SEMA-MT):</b> {nomes}", small))
+        if autuacoes.get("items"):
+            top_aut = autuacoes["items"][:5]
+            aut_txt = "; ".join(
+                f"Auto {a.get('numero_auto_infracao','N/D')} ({a.get('municipio','N/D')}, {a.get('situacao','N/D')})"
+                for a in top_aut
+            )
+            elements.append(Paragraph(f"<b>Autuações mais recentes:</b> {aut_txt}", small))
+
     elements.append(Spacer(1, 0.6 * cm))
 
     elements.append(Paragraph(
         "Fontes de dados: Copernicus Data Space Ecosystem (Sentinel-2 L2A, ESA/UE) · "
-        "INPE Brazil Data Cube (CBERS-4A/WFI) · TerraBrasilis DETER/PRODES (INPE). "
+        "INPE Brazil Data Cube (CBERS-4A/WFI) · TerraBrasilis DETER/PRODES (INPE) · "
+        "Geoportal SEMA-MT (camadas complementares, fonte não oficialmente confirmada). "
         "Gerado automaticamente pelo MT GeoApp.", small
     ))
 

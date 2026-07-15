@@ -12,6 +12,8 @@ contextualizar alertas de desmatamento com informacoes fundiarias e de fogo.
 import httpx
 from shapely.geometry import shape, box
 
+from services import sema_mt
+
 GEOSERVER_BASE = "https://terrabrasilis.dpi.inpe.br/queimadas/geoserver/bdqueimadas2/ows"
 
 # workspace fixo: bdqueimadas2
@@ -118,13 +120,45 @@ async def query_unidades_conservacao(geometry: dict):
         partial_errors.append(f"UC federais indisponível no momento ({fed['error']})")
     if est.get("error"):
         partial_errors.append(f"UC estaduais indisponível no momento ({est['error']})")
+
+    fallback_used = False
+    fallback_note = None
+    # Fallback: quando a consulta oficial (TerraBrasilis/INPE) falha para
+    # alguma esfera, tenta complementar com a camada unificada do
+    # Geoportal SEMA-MT (fonte nao oficialmente confirmada - ver
+    # services/sema_mt.py). O resultado do fallback e' mesclado e
+    # sinalizado explicitamente, nunca substitui silenciosamente a fonte
+    # oficial.
+    if partial_errors:
+        try:
+            sema_result = await sema_mt.query_unidades_conservacao_sema(geometry)
+            if not sema_result.get("error") and sema_result.get("count", 0) >= 0:
+                nomes_existentes = {i["nome"] for i in items if i.get("nome")}
+                for i in sema_result.get("items", []):
+                    if i.get("nome") and i["nome"] not in nomes_existentes:
+                        items.append({
+                            "nome": i.get("nome"),
+                            "esfera": i.get("esfera") or "N/D",
+                            "via_fallback_sema_mt": True,
+                        })
+                fallback_used = True
+                fallback_note = (
+                    "Complementado com dados do Geoportal SEMA-MT (fonte não "
+                    "oficialmente confirmada, ver documentação) para cobrir a "
+                    "falha da fonte oficial acima."
+                )
+        except Exception as e:
+            fallback_note = f"Fallback SEMA-MT também falhou: {e}"
+
     return {
         "source": "Unidades de Conservação (ICMBio/SEMA-MT via TerraBrasilis/INPE)",
         "count": len(items),
         "items": items,
         "error": fed.get("error") or est.get("error"),
-        "partial": bool(partial_errors),
+        "partial": bool(partial_errors) and not fallback_used,
         "partial_errors": partial_errors,
+        "fallback_used": fallback_used,
+        "fallback_note": fallback_note,
     }
 
 
@@ -199,6 +233,12 @@ async def get_context_summary(geometry: dict, focos_days: int = 30):
             "⚠️ Consulta de Unidades de Conservação incompleta (" +
             "; ".join(uc_result.get("partial_errors", [])) +
             "). O resultado acima NÃO deve ser interpretado como confirmação de ausência de UC."
+        )
+    if uc_result.get("fallback_used"):
+        alerts.append(
+            "ℹ️ A fonte oficial (TerraBrasilis/INPE) falhou para uma ou mais esferas de "
+            "Unidades de Conservação; o resultado foi complementado com o Geoportal SEMA-MT "
+            "(fonte não oficialmente confirmada, ver /api/context/car para detalhes)."
         )
     if focos_result.get("count", 0) > 0:
         alerts.append(
