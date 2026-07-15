@@ -161,7 +161,7 @@ function hideLoading() {
 
 // ---------- SEARCH & RESULTS ----------
 let collectedImages = []; // for report
-let lastDeter = null, lastProdes = null, lastContext = null;
+let lastDeter = null, lastProdes = null, lastContext = null, lastCarSema = null;
 
 document.getElementById("btn-search").addEventListener("click", async () => {
   if (!currentGeometry) return showToast("Desenhe uma área no mapa primeiro.", "error");
@@ -175,6 +175,7 @@ document.getElementById("btn-search").addEventListener("click", async () => {
   const wantDeter = document.getElementById("src-deter").checked;
   const wantProdes = document.getElementById("src-prodes").checked;
   const wantContext = document.getElementById("src-context").checked;
+  const wantCarSema = document.getElementById("src-car-sema").checked;
 
   const resultsContainer = document.getElementById("results-container");
   resultsContainer.innerHTML = "";
@@ -202,6 +203,9 @@ document.getElementById("btn-search").addEventListener("click", async () => {
     }
     if (wantContext) {
       await handleContextSummary();
+    }
+    if (wantCarSema) {
+      await handleCarSema();
     }
     document.getElementById("btn-report").disabled = false;
   } catch (e) {
@@ -366,6 +370,47 @@ async function handleContextSummary() {
     infoParts.join(" · "), hasOverlap || hasFocos);
 }
 
+async function handleCarSema() {
+  showLoading("Consultando camadas SEMA-MT/CAR (UC, APP, Reserva Legal, Autuações)...");
+  const resp = await fetch(`${API_BASE}/api/context/car`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ geometry: currentGeometry }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    return addResultCard("Camadas SEMA-MT/CAR", null, `Erro: ${err.detail || resp.statusText}`, true);
+  }
+  const data = await resp.json();
+  lastCarSema = data;
+
+  const uc = data.unidades_conservacao_sema, app = data.car_app, arl = data.car_arl,
+    consolidada = data.area_consolidada, autuacoes = data.autuacoes_fiscalizacao;
+  const hasAlert = (autuacoes.count > 0);
+
+  const infoParts = [];
+  infoParts.push(`UC (Fed+Est+Mun): ${uc.count}`);
+  infoParts.push(`APP: ${app.count} registro(s) · ${app.area_total_ha} ha`);
+  infoParts.push(`Reserva Legal: ${arl.count} registro(s) · ${arl.area_total_ha} ha`);
+  infoParts.push(`Área consolidada: ${consolidada.count} registro(s) · ${consolidada.area_total_ha} ha`);
+  infoParts.push(autuacoes.count > 0
+    ? `⚠️ ${autuacoes.count} autuação(ões)/embargo(s) ambiental(is) na área`
+    : "Autuações/Embargos: nenhum na área");
+
+  const cardId = addResultCard(
+    "Camadas SEMA-MT/CAR — UC, APP, Reserva Legal, Área Consolidada, Autuações",
+    null, infoParts.join(" · "), hasAlert
+  );
+  const card = document.getElementById(cardId);
+  if (card) {
+    const warn = document.createElement("div");
+    warn.className = "source-warning";
+    warn.textContent = "⚠️ Fonte não oficialmente confirmada pela SEMA-MT: acesso via chave (authkey) " +
+      "localizada em documentação técnica de terceiros, sem termos de uso publicados. Use como " +
+      "complemento às fontes oficiais (Copernicus/INPE/TerraBrasilis), não como base isolada.";
+    card.appendChild(warn);
+  }
+}
+
 let cardCounter = 0;
 function addResultCard(title, previewBase64, infoText, isWarning, imageMeta) {
   cardCounter += 1;
@@ -424,6 +469,7 @@ document.getElementById("btn-report").addEventListener("click", async () => {
       deter_summary: lastDeter,
       prodes_summary: lastProdes,
       context_summary: lastContext,
+      car_sema_summary: lastCarSema,
       generated_at: new Date().toISOString(),
     };
     const resp = await fetch(`${API_BASE}/api/report/generate`, {
