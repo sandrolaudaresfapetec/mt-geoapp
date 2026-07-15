@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MT GeoApp — Download de Imagens de Satélite</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-icon">🛰️</span>
+      <div>
+        <h1>MT GeoApp</h1>
+        <p>Download de imagens de satélite para Mato Grosso</p>
+      </div>
+    </div>
+    <button id="btn-settings" class="btn btn-outline">⚙️ Configurações</button>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <section class="panel">
+        <h2>1. Área de interesse</h2>
+        <p class="hint">Use as ferramentas de desenho no mapa (canto superior direito) para desenhar um polígono ou retângulo sobre a área desejada.</p>
+        <div id="area-stats" class="stats-box hidden">
+          <div><span>Área</span><strong id="stat-area">-</strong></div>
+          <div><span>Perímetro</span><strong id="stat-perimeter">-</strong></div>
+          <div><span>Centróide</span><strong id="stat-centroid">-</strong></div>
+        </div>
+        <button id="btn-clear-geom" class="btn btn-ghost hidden">🗑️ Limpar área</button>
+      </section>
+
+      <section class="panel">
+        <h2>2. Período de busca</h2>
+        <label>Data inicial<input type="date" id="date-start"></label>
+        <label>Data final<input type="date" id="date-end"></label>
+      </section>
+
+      <section class="panel">
+        <h2>3. Fontes de imagem</h2>
+        <label class="check-row"><input type="checkbox" id="src-sentinel2" checked> Sentinel-2 (Copernicus) — 10m</label>
+        <label class="check-row"><input type="checkbox" id="src-cbers4a" checked> CBERS-4A (INPE) — até 16,5m</label>
+        <label class="check-row"><input type="checkbox" id="src-deter" checked> DETER — alertas de desmatamento</label>
+        <label class="check-row"><input type="checkbox" id="src-prodes" checked> PRODES — desmatamento anual</label>
+        <label class="check-row"><input type="checkbox" id="src-context" checked> Contexto Socioambiental — TI / UC / Focos de calor</label>
+        <button id="btn-search" class="btn btn-primary" disabled>🔍 Buscar imagens</button>
+      </section>
+
+      <section class="panel" id="results-panel" style="display:none;">
+        <h2>4. Resultados</h2>
+        <div id="results-container"></div>
+      </section>
+
+      <section class="panel">
+        <h2>5. Relatório</h2>
+        <p class="hint">Gere um PDF com o mapa da área, imagens baixadas, estatísticas e comparação entre fontes.</p>
+        <button id="btn-report" class="btn btn-secondary" disabled>📄 Gerar relatório PDF</button>
+      </section>
+    </aside>
+
+    <div id="map"></div>
+  </main>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2>Configurações de credenciais</h2>
+      <button id="close-settings" class="btn-icon">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="hint">As credenciais ficam salvas apenas no seu navegador (localStorage) e são enviadas diretamente para as APIs oficiais a cada requisição. Nunca são armazenadas em nosso servidor.</p>
+
+      <h3>Copernicus Data Space Ecosystem (Sentinel-2)</h3>
+      <p class="hint small">Necessário para buscar/baixar Sentinel-2. <a href="https://dataspace.copernicus.eu/" target="_blank">Criar conta gratuita →</a></p>
+      <label>Client ID<input type="text" id="cred-cop-id" placeholder="seu-client-id"></label>
+      <label>Client Secret<input type="password" id="cred-cop-secret" placeholder="seu-client-secret"></label>
+
+      <h3>INPE Brazil Data Cube (CBERS-4A)</h3>
+      <p class="hint small">Opcional para algumas coleções públicas; recomendado para maior estabilidade. <a href="https://data.inpe.br/bdc/" target="_blank">Criar conta gratuita →</a></p>
+      <label>Personal Access Token<input type="password" id="cred-bdc-token" placeholder="seu-token-bdc"></label>
+
+      <div class="modal-actions">
+        <button id="btn-validate-creds" class="btn btn-outline">Validar credenciais</button>
+        <button id="btn-save-creds" class="btn btn-primary">Salvar</button>
+      </div>
+      <div id="cred-validation-result"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="loading-overlay" class="hidden"><div class="spinner"></div><p id="loading-text">Processando...</p></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

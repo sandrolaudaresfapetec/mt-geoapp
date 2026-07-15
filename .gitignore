@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.env
+*.env
+.secrets/
+.DS_Store
+*.tiff
+*.tif
+venv/
+.venv/
