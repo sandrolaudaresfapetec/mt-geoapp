@@ -58,6 +58,14 @@ flyctl deploy --remote-only
 
 App configurado em `fly.toml` (app `mt-geoapp`, região `gru`).
 
+### CI/CD automático
+
+Todo push na branch `main` dispara automaticamente:
+1. **CI** (`.github/workflows/ci.yml`) — lint, checagem de sintaxe Python/JS, sanity check de import e build de teste do Docker.
+2. **Deploy** (`.github/workflows/fly-deploy.yml`) — só executa se o CI passou, publicando a nova versão no Fly.io.
+
+Guia completo e didático de todo o processo (do primeiro commit ao pipeline funcionando, incluindo os bugs reais encontrados no caminho): [docs/CI_CD.md](docs/CI_CD.md).
+
 ## Principais endpoints
 
 | Método | Rota | Descrição |
