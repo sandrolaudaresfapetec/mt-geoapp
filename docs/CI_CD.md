@@ -13,6 +13,10 @@ precise ser repetido em outro projeto.
 
 ## Visão geral do fluxo final
 
+![Diagrama do pipeline CI/CD do MT GeoApp](images/pipeline-ci-cd.png)
+
+Em texto corrido, o mesmo fluxo representado no diagrama acima:
+
 ```
  Você edita o código localmente
         │
