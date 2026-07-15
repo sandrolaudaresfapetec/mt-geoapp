@@ -565,6 +565,48 @@ Repositório GitHub (sandrolaudaresfapetec/mt-geoapp)
 
 ---
 
+## Etapa 5 — Camadas complementares: SEMA-MT / CAR
+
+Após o pipeline de CI/CD estabilizado, foi adicionada uma nova fonte de dados
+ao contexto socioambiental: o **Geoportal da SEMA-MT** (Secretaria de Estado
+de Meio Ambiente de Mato Grosso), um GeoServer público com WFS que expõe
+136 camadas fundiárias/ambientais do estado.
+
+**O que foi integrado** (`backend/services/sema_mt.py`, endpoint
+`POST /api/context/car`):
+
+- Unidades de Conservação unificadas (Federal + Estadual + Municipal numa
+  única camada) — usada também como **fallback automático** em
+  `/api/context/summary` quando a fonte oficial (TerraBrasilis/INPE) falha
+  para UC federal/estadual (o bug documentado na Etapa 4 / erros reais).
+- CAR — Área de Preservação Permanente declarada (`CAR_APP`)
+- CAR — Reserva Legal declarada (`CAR_ARL`)
+- Área Consolidada / uso antrópico (`SIMCAR_D_AREA_CONSOLIDADA`)
+- Autuações e embargos ambientais da fiscalização SEMA-MT
+
+**Aviso importante sobre a fonte:** o acesso a esse GeoServer exige um
+parâmetro `authkey` que não está documentado oficialmente pela SEMA-MT (não
+há portal de desenvolvedor nem termos de uso publicados); a chave foi
+localizada em um documento técnico de terceiros e validada empiricamente
+com requisições WFS reais (HTTP 200). Por decisão de produto, essa fonte é
+usada **apenas como complemento**, nunca substituindo silenciosamente a
+fonte oficial:
+
+- Toda resposta desse módulo carrega `"unverified_source": true` e um
+  `source_note` explicando a situação.
+- No relatório PDF, a seção 6 ("Camadas Complementares — CAR/SEMA-MT") tem
+  um aviso visual em destaque (cor de alerta) repetindo essa ressalva.
+- Quando usada como fallback de UC, a resposta inclui `fallback_used: true`
+  e um alerta específico apontando a falha da fonte oficial que motivou o
+  fallback — o usuário nunca vê "0 UC" sem saber que há uma consulta
+  alternativa por trás.
+
+Essa integração passou pelos mesmos testes end-to-end do restante do
+projeto: validação de sintaxe, teste local via `uvicorn`, teste dos três
+endpoints (`/api/context/car`, `/api/context/summary` com fallback, e
+`/api/report/generate` com a nova seção do PDF) e validação em produção
+após o deploy, com resultados idênticos entre local e produção.
+
 ## Erros reais encontrados neste processo (e a lição de cada um)
 
 1. **Aspas capturadas ao extrair o token do Fly.io** → o secret criptografado
