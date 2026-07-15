@@ -1,22 +1,29 @@
 name: Deploy to Fly.io
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
   workflow_dispatch: {}
 
 concurrency:
-  group: fly-deploy-${{ github.ref }}
+  group: fly-deploy-main
   cancel-in-progress: true
 
 jobs:
   deploy:
     name: Deploy app
     runs-on: ubuntu-latest
+    # Só faz deploy se o gatilho foi manual OU se o CI da main terminou com sucesso.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Setup flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
